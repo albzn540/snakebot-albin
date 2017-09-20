@@ -6,17 +6,16 @@ import org.springframework.util.concurrent.ListenableFuture;
 import org.springframework.web.socket.WebSocketSession;
 import se.cygni.snake.api.event.*;
 import se.cygni.snake.api.exception.InvalidPlayerName;
-import se.cygni.snake.api.model.GameMode;
-import se.cygni.snake.api.model.GameSettings;
-import se.cygni.snake.api.model.PlayerPoints;
-import se.cygni.snake.api.model.SnakeDirection;
+import se.cygni.snake.api.model.*;
 import se.cygni.snake.api.response.PlayerRegistered;
 import se.cygni.snake.api.util.GameSettingsUtils;
 import se.cygni.snake.client.AnsiPrinter;
 import se.cygni.snake.client.BaseSnakeClient;
+import se.cygni.snake.client.MapCoordinate;
 import se.cygni.snake.client.MapUtil;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
 
@@ -37,6 +36,9 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
     // Set to false if you don't want the game world printed every game tick.
     private static final boolean ANSI_PRINTER_ACTIVE = false;
     private AnsiPrinter ansiPrinter = new AnsiPrinter(ANSI_PRINTER_ACTIVE, true);
+
+    //-------------------------------------- Own Stuff ----------------------------------------------//
+    private SnakeDirection lastDirection;
 
     public static void main(String[] args) {
         SimpleSnakePlayer simpleSnakePlayer = new SimpleSnakePlayer();
@@ -84,20 +86,68 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
         //will hold the available absolute snake directions
         List<SnakeDirection> directions = new ArrayList<>();
 
+        SnakeInfo[] snakesInfo = mapUpdateEvent.getMap().getSnakeInfos();
+        String id = snakesInfo[1].getId();
+        MapCoordinate snake1 = mapUtil.getSnakeSpread(id)[0];
+
+        //For use in PathElement tree
+        MapCoordinate myPos = mapUtil.getMyPosition();
+        MapCoordinate myNewPos = myPos.translateBy(0, 0);
+        HashMap<SnakeDirection, MapCoordinate> dirAndNewPos = new HashMap();
+
         // Let's see in which directions I can move
         for (SnakeDirection direction : SnakeDirection.values()) {
-            if (mapUtil.canIMoveInDirection(direction)) {
-                directions.add(direction);
+            try {
+                switch (direction) {
+                    case DOWN:
+                        myNewPos = myPos.translateBy(0, 1);
+                        break;
+                    case UP:
+                        myNewPos = myPos.translateBy(0, -1);
+                        break;
+                    case LEFT:
+                        myNewPos = myPos.translateBy(-1, 0);
+                        break;
+                    case RIGHT:
+                        myNewPos = myPos.translateBy(1, 0);
+                }
+
+                if(mapUtil.isTileAvailableForMovementTo(myNewPos)) {
+                    dirAndNewPos.put(direction, myNewPos);
+                }
+
+            } catch (Exception e) {
+                LOGGER.error("Something went horribly wrong when " +
+                        "calculating the new position");
             }
         }
-        Random r = new Random();
-        SnakeDirection chosenDirection = SnakeDirection.DOWN;
 
-        // Choose a random direction
-        if (!directions.isEmpty())
-            chosenDirection = directions.get(r.nextInt(directions.size()));
+        //Array with first childs
+        List<PathElement> childs = new ArrayList<>();
+        //predict n steps
+        int predictSteps = 10;
 
-        // Register action here!
+        for (HashMap.Entry<SnakeDirection, MapCoordinate> entry : dirAndNewPos.entrySet()) {
+
+            // each one on new thread?
+            childs.add(new PathElement(
+                    entry.getKey(),
+                    entry.getValue(),
+                    mapUtil.listCoordinatesContainingObstacle(),
+                    new ArrayList<MapCoordinate>(),
+                    predictSteps));
+        }
+
+        //I've got a duplication problem with filledspaces (snake head iteration)
+
+        for (PathElement child : childs) {
+            //count elems?
+        }
+
+
+        mapUtil.getMyPosition();
+        SnakeDirection chosenDirection = SnakeDirection.UP;
+
         registerMove(mapUpdateEvent.getGameTick(), chosenDirection);
     }
 
