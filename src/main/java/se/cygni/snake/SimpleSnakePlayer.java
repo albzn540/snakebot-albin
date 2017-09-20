@@ -17,7 +17,6 @@ import se.cygni.snake.client.MapUtil;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Random;
 
 public class SimpleSnakePlayer extends BaseSnakeClient {
 
@@ -38,7 +37,16 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
     private AnsiPrinter ansiPrinter = new AnsiPrinter(ANSI_PRINTER_ACTIVE, true);
 
     //-------------------------------------- Own Stuff ----------------------------------------------//
+
+    //These you can change:
+    private int predictSteps = 10;
+
+    //These you can not!
     private SnakeDirection lastDirection;
+
+    class WrapInt {
+        public int value;
+    }
 
     public static void main(String[] args) {
         SimpleSnakePlayer simpleSnakePlayer = new SimpleSnakePlayer();
@@ -83,17 +91,12 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
         // MapUtil contains lot's of useful methods for querying the map!
         MapUtil mapUtil = new MapUtil(mapUpdateEvent.getMap(), getPlayerId());
 
-        //will hold the available absolute snake directions
-        List<SnakeDirection> directions = new ArrayList<>();
 
-        SnakeInfo[] snakesInfo = mapUpdateEvent.getMap().getSnakeInfos();
-        String id = snakesInfo[1].getId();
-        MapCoordinate snake1 = mapUtil.getSnakeSpread(id)[0];
 
         //For use in PathElement tree
-        MapCoordinate myPos = mapUtil.getMyPosition();
-        MapCoordinate myNewPos = myPos.translateBy(0, 0);
-        HashMap<SnakeDirection, MapCoordinate> dirAndNewPos = new HashMap();
+        MapCoordinate myPos = mapUtil.getMyPosition();                          //My snakes head MapCoorinate
+        MapCoordinate myNewPos = myPos.translateBy(0, 0);           //My new pos based on direction
+        HashMap<SnakeDirection, MapCoordinate> dirAndNewPos = new HashMap<>();    //HashMap with available moves and the new pos after that
 
         // Let's see in which directions I can move
         for (SnakeDirection direction : SnakeDirection.values()) {
@@ -122,31 +125,51 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
             }
         }
 
-        //Array with first childs
-        List<PathElement> childs = new ArrayList<>();
-        //predict n steps
-        int predictSteps = 10;
+        List<Integer> sizeArray = new ArrayList<>();
 
         for (HashMap.Entry<SnakeDirection, MapCoordinate> entry : dirAndNewPos.entrySet()) {
+
+            WrapInt sizeInt = new WrapInt();
+
+            //Array with first childs
+            List<PathElement> childs = new ArrayList<>();
 
             // each one on new thread?
             childs.add(new PathElement(
                     entry.getKey(),
                     entry.getValue(),
                     mapUtil.listCoordinatesContainingObstacle(),
-                    new ArrayList<MapCoordinate>(),
-                    predictSteps));
+                    otherSnakeHeads,
+                    predictSteps,
+                    sizeInt,
+                    mapUtil));
+
+            sizeArray.add(sizeInt.value);
+            System.out.println("SizePointer: " + sizeInt.value);
         }
 
-        //I've got a duplication problem with filledspaces (snake head iteration)
-
-        for (PathElement child : childs) {
-            //count elems?
+        int biggestYet = sizeArray.get(0);
+        int index = 0;
+        while( index < sizeArray.size()) {
+            if(sizeArray.get(index) > biggestYet) {
+                biggestYet = sizeArray.get(index);
+            }
+            index++;
         }
 
-
-        mapUtil.getMyPosition();
         SnakeDirection chosenDirection = SnakeDirection.UP;
+
+        System.out.println("Done Calculating, biggest value is: " + biggestYet);
+        System.out.println("With the index of: " + index);
+
+        int currentIndex = 0;
+        for (HashMap.Entry<SnakeDirection, MapCoordinate> entry : dirAndNewPos.entrySet()) {
+            if(index == currentIndex) {
+                chosenDirection = entry.getKey();
+                break;
+            }
+            currentIndex++;
+        }
 
         registerMove(mapUpdateEvent.getGameTick(), chosenDirection);
     }
