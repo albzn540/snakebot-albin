@@ -43,9 +43,21 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
 
     //These you can not!
     private SnakeDirection lastDirection;
+    private BetterMap betterMap;
+    private String url;
+    private ArrayList<Long> timers = new ArrayList<>();
 
     class WrapInt {
         public int value;
+        public WrapInt() {
+            value = 0;
+        }
+        public void increment() {
+            value++;
+        }
+        public void reset(){
+            value = 0;
+        }
     }
 
     public static void main(String[] args) {
@@ -87,43 +99,15 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
     @Override
     public void onMapUpdate(MapUpdateEvent mapUpdateEvent) {
         ansiPrinter.printMap(mapUpdateEvent);
+        long startTimer = System.currentTimeMillis();
 
         // MapUtil contains lot's of useful methods for querying the map!
         MapUtil mapUtil = new MapUtil(mapUpdateEvent.getMap(), getPlayerId());
-
-
-
-        //For use in PathElement tree
-        MapCoordinate myPos = mapUtil.getMyPosition();                          //My snakes head MapCoorinate
-        MapCoordinate myNewPos = myPos.translateBy(0, 0);           //My new pos based on direction
-        HashMap<SnakeDirection, MapCoordinate> dirAndNewPos = new HashMap<>();    //HashMap with available moves and the new pos after that
+        betterMap = new BetterMap(mapUpdateEvent.getMap(), getPlayerId());
+        betterMap.maxPredictSteps = predictSteps;
 
         // Let's see in which directions I can move
-        for (SnakeDirection direction : SnakeDirection.values()) {
-            try {
-                switch (direction) {
-                    case DOWN:
-                        myNewPos = myPos.translateBy(0, 1);
-                        break;
-                    case UP:
-                        myNewPos = myPos.translateBy(0, -1);
-                        break;
-                    case LEFT:
-                        myNewPos = myPos.translateBy(-1, 0);
-                        break;
-                    case RIGHT:
-                        myNewPos = myPos.translateBy(1, 0);
-                }
-
-                if(mapUtil.isTileAvailableForMovementTo(myNewPos)) {
-                    dirAndNewPos.put(direction, myNewPos);
-                }
-
-            } catch (Exception e) {
-                LOGGER.error("Something went horribly wrong when " +
-                        "calculating the new position");
-            }
-        }
+        HashMap<SnakeDirection, MapCoordinate> dirAndNewPos = betterMap.availableMoves(mapUtil.getMyPosition());
 
         List<Integer> sizeArray = new ArrayList<>();
 
@@ -138,40 +122,50 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
             childs.add(new PathElement(
                     entry.getKey(),
                     entry.getValue(),
-                    mapUtil.listCoordinatesContainingObstacle(),
-                    otherSnakeHeads,
-                    predictSteps,
-                    sizeInt,
-                    mapUtil));
+                    betterMap,
+                    0,
+                    sizeInt));
 
             sizeArray.add(sizeInt.value);
-            System.out.println("SizePointer: " + sizeInt.value);
+            sizeInt.reset();
         }
 
         int biggestYet = sizeArray.get(0);
         int index = 0;
+        int biggestIndex = index;
         while( index < sizeArray.size()) {
             if(sizeArray.get(index) > biggestYet) {
                 biggestYet = sizeArray.get(index);
+                biggestIndex = index;
             }
             index++;
         }
 
-        SnakeDirection chosenDirection = SnakeDirection.UP;
-
-        System.out.println("Done Calculating, biggest value is: " + biggestYet);
-        System.out.println("With the index of: " + index);
+        SnakeDirection chosenDirection = lastDirection;
 
         int currentIndex = 0;
         for (HashMap.Entry<SnakeDirection, MapCoordinate> entry : dirAndNewPos.entrySet()) {
-            if(index == currentIndex) {
+
+            if(biggestIndex == currentIndex) {
                 chosenDirection = entry.getKey();
-                break;
             }
+
             currentIndex++;
         }
 
+        MaximalTriangle tri = new MaximalTriangle();
+        Rectangle rectangle = tri.maximalTriangle(betterMap);
+
+        System.out.println("Biggest rectangle at (" + rectangle.x + ", " + rectangle.y + ")" +
+                "     With an area of: " + rectangle.area);
+
+        long stopTimer = System.currentTimeMillis();
+        timers.add(stopTimer-startTimer);
+        //System.out.println("Chosen dir: " + chosenDirection + "          Walkdist: " + biggestYet);
+        //System.out.println("Response time: " + (stopTimer-startTimer));
+
         registerMove(mapUpdateEvent.getGameTick(), chosenDirection);
+        lastDirection = chosenDirection;
     }
 
 
@@ -189,8 +183,19 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
 
     @Override
     public void onGameResult(GameResultEvent gameResultEvent) {
+
         LOGGER.info("Game result:");
         gameResultEvent.getPlayerRanks().forEach(playerRank -> LOGGER.info(playerRank.toString()));
+
+        LOGGER.info("The game is over and can be viewed at: {}", url);
+
+        //calc average time
+        long tot = 0;
+        for (Long time : timers) {
+            tot += time;
+        }
+        long average = tot / timers.size();
+        LOGGER.info("Average response time: " + average);
     }
 
     @Override
@@ -219,11 +224,14 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
         for (PlayerPoints pp : tournamentEndedEvent.getGameResult()) {
             LOGGER.info("{}. {} - {} points", c++, pp.getName(), pp.getPoints());
         }
+
+        LOGGER.info("Watch the game at: {}", url);
     }
 
     @Override
     public void onGameLink(GameLinkEvent gameLinkEvent) {
         LOGGER.info("The game can be viewed at: {}", gameLinkEvent.getUrl());
+        url = gameLinkEvent.getUrl();
     }
 
     @Override

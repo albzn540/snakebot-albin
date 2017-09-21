@@ -1,12 +1,18 @@
 package se.cygni.snake;
 
+import javafx.scene.control.Cell;
 import se.cygni.snake.api.event.MapUpdateEvent;
+import se.cygni.snake.api.model.Map;
+import se.cygni.snake.api.model.SnakeDirection;
 import se.cygni.snake.api.model.SnakeInfo;
 import se.cygni.snake.client.MapCoordinate;
 import se.cygni.snake.client.MapUtil;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+
+import static com.sun.xml.internal.ws.spi.db.BindingContextFactory.LOGGER;
 
 public class BetterMap {
 
@@ -15,58 +21,73 @@ public class BetterMap {
         ENEMYHEAD,
         FOOD,
         OBSTACLE,
-        EMPTY
+        ENEMYSNAKE
     }
 
     public MapUpdateEvent mapUpdateEvent;
     public CellThing[][] map;
     public int predictedMapStep = 0;
+    public int maxPredictSteps = 10; //but is primarily set in SimpleSnakePlayer class
 
     private MapUtil mapUtil;
-    private List<MapCoordinate> otherSnakeHeads = new ArrayList<>();
+    private List<MapCoordinate[]> otherSnakes = new ArrayList<>();
     private int mapHeight;
     private int mapWidth;
+    private String playerID;
 
 
-    public BetterMap(MapUpdateEvent mapUpdateEvent, String playerID) {
+    public BetterMap(Map mapUpdateEvent, String playerID) {
 
-        this.mapUpdateEvent = mapUpdateEvent;
-        mapHeight = mapUpdateEvent.getMap().getHeight();
-        mapWidth = mapUpdateEvent.getMap().getWidth();
+        mapHeight = mapUpdateEvent.getHeight();
+        mapWidth = mapUpdateEvent.getWidth();
+        this.playerID = playerID;
 
-        mapUtil = new MapUtil(mapUpdateEvent.getMap(), playerID);
+        map = new CellThing[mapWidth][mapHeight];
 
-        //Get other snake id's and heads
+        mapUtil = new MapUtil(mapUpdateEvent, playerID);
 
-        SnakeInfo[] snakesInfo = mapUpdateEvent.getMap().getSnakeInfos();
+        //Get other snake id's and spread
+        SnakeInfo[] snakesInfo = mapUpdateEvent.getSnakeInfos();
         for(int i = 0; i < snakesInfo.length; i++) {
             String id = snakesInfo[i].getId();
-            if(id.equals(playerID)) {
-                otherSnakeHeads.add(mapUtil.getSnakeSpread(id)[0]); //save coordinate of snake heads
+            if(!id.equals(playerID) && snakesInfo[i].isAlive()) {
+                otherSnakes.add(mapUtil.getSnakeSpread(id)); //save coordinate of snakes
             }
         }
 
-
+        importFromMapUtil();
     }
 
     private void importFromMapUtil() {
-        mapUpdateEvent.getMap().getFoodPositions();
-        mapUtil.listCoordinatesContainingFood();
-
         //imports food
         for (MapCoordinate coordinate : mapUtil.listCoordinatesContainingFood()) {
             map[coordinate.x][coordinate.y] = CellThing.FOOD;
         }
 
         //import obstacles
-        //is the rest of the snakebody an obstacle?
         for (MapCoordinate coordinate : mapUtil.listCoordinatesContainingObstacle()) {
             map[coordinate.x][coordinate.y] = CellThing.OBSTACLE;
         }
 
-        for (MapCoordinate coordinate : otherSnakeHeads) {
-            map[coordinate.x][coordinate.y] = CellThing.ENEMYHEAD;
+        //import other snakes
+        for (MapCoordinate[] snake : otherSnakes) {
+
+            //head
+            map[snake[0].x][snake[0].y] = CellThing.ENEMYHEAD;
+
+
+            //body
+            for(int i = 1; i < snake.length; i++) {
+                map[snake[i].x][snake[i].y] = CellThing.ENEMYSNAKE;
+            }
         }
+
+        //import own body
+        MapCoordinate[] ownSnake = mapUtil.getSnakeSpread(playerID);
+        for (MapCoordinate coordinate : ownSnake){
+            map[coordinate.x][coordinate.y] = CellThing.OBSTACLE;
+        }
+
 
     }
 
@@ -79,17 +100,24 @@ public class BetterMap {
                 if (map[x][y].equals(CellThing.ENEMYHEAD)) {
                     //assume they go everywhere at once
 
-                    map[x][y] = CellThing.OBSTACLE;
+                    map[x][y] = CellThing.ENEMYSNAKE;
 
-                    //have to check if its available to go to before
-                    if(x+1 < mapWidth) map[x+1][y] = CellThing.ENEMYHEAD;
-                    if(x-1 >= 0) map[x-1][y] = CellThing.ENEMYHEAD;
-                    if(y+1 < mapHeight) map[x][y+1] = CellThing.ENEMYHEAD;
-                    if(y-1 >= 0) map[x][y-1] = CellThing.ENEMYHEAD;
+                    //have to check if its safe to go to before moving
+                    MapCoordinate newPos = new MapCoordinate(x+1,y);
+                    if(isTileAvailableForMovementTo(newPos))
+                        setCell(newPos, CellThing.ENEMYHEAD);
 
-                    if (x < mapWidth && x >= 0) {
+                    newPos = new MapCoordinate(x,y+1);
+                    if(isTileAvailableForMovementTo(newPos))
+                        setCell(newPos, CellThing.ENEMYHEAD);
 
-                    }
+                    newPos = new MapCoordinate(x-1,y);
+                    if(isTileAvailableForMovementTo(newPos))
+                        setCell(newPos, CellThing.ENEMYHEAD);
+
+                    newPos = new MapCoordinate(x,y-1);
+                    if(isTileAvailableForMovementTo(newPos))
+                        setCell(newPos, CellThing.ENEMYHEAD);
                 }
             }
         }
@@ -101,6 +129,41 @@ public class BetterMap {
         predictOtherSnakesPath();
     }
 
+    public HashMap<SnakeDirection, MapCoordinate> myAvailableMoves() {
+        return availableMoves(mapUtil.getMyPosition());
+    }
+
+    public HashMap<SnakeDirection, MapCoordinate> availableMoves(MapCoordinate currentCoordinate) {
+        MapCoordinate myNewPos = currentCoordinate.translateBy(0, 0);
+        HashMap<SnakeDirection, MapCoordinate> dirAndNewPos = new HashMap<>();    //HashMap with available moves and the new pos after that
+        // Let's see in which directions I can move
+        for (SnakeDirection direction : SnakeDirection.values()) {
+            try {
+                switch (direction) {
+                    case DOWN:
+                        myNewPos = currentCoordinate.translateBy(0, 1);
+                        break;
+                    case UP:
+                        myNewPos = currentCoordinate.translateBy(0, -1);
+                        break;
+                    case LEFT:
+                        myNewPos = currentCoordinate.translateBy(-1, 0);
+                        break;
+                    case RIGHT:
+                        myNewPos = currentCoordinate.translateBy(1, 0);
+                }
+
+                if(isTileAvailableForMovementTo(myNewPos))
+                    dirAndNewPos.put(direction, myNewPos);
+
+            } catch (Exception e) {
+                LOGGER.info("Error in evaluating your path" + e);
+            }
+        }
+
+        return dirAndNewPos;
+    }
+
     public MapCoordinate[] getObstaclesMapCoordinate() {
         return mapUtil.listCoordinatesContainingObstacle();
     }
@@ -109,7 +172,30 @@ public class BetterMap {
         return mapUtil.listCoordinatesContainingFood();
     }
 
-    public void isSafeToGoTo() {
+    private void setCell(MapCoordinate coordinate, CellThing thing) {
+        map[coordinate.x][coordinate.y] = thing;
+    }
 
+    private boolean isTileAvailableForMovementTo(MapCoordinate coordinate) {
+        if(mapUtil.isCoordinateOutOfBounds(coordinate)) return false;
+        if(!safeTile(coordinate)) return false;
+        return true;
+    }
+
+    /*
+    Returns true if it is empty or contains food
+    In other words, is it safe?
+     */
+    public boolean safeTile(MapCoordinate coordinate){
+        CellThing thing = map[coordinate.x][coordinate.y];
+        return (thing == null || thing.equals(CellThing.FOOD));
+    }
+
+    /*
+    Counts an obstacle as safe
+     */
+    public boolean safeTileWithObstacle(MapCoordinate coordinate) {
+        CellThing thing = map[coordinate.x][coordinate.y];
+        return (thing == null || thing.equals(CellThing.FOOD) || thing.equals(CellThing.OBSTACLE) );
     }
 }
