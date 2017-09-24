@@ -153,12 +153,6 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
             currentIndex++;
         }
 
-        MaximalTriangle tri = new MaximalTriangle();
-        Rectangle rectangle = tri.maximalTriangle(betterMap);
-
-        System.out.println("Biggest rectangle at (" + rectangle.x + ", " + rectangle.y + ")" +
-                "     With an area of: " + rectangle.area);
-
         long stopTimer = System.currentTimeMillis();
         timers.add(stopTimer-startTimer);
         //System.out.println("Chosen dir: " + chosenDirection + "          Walkdist: " + biggestYet);
