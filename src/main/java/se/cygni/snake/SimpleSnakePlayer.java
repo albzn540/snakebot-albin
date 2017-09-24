@@ -39,13 +39,14 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
     //-------------------------------------- Own Stuff ----------------------------------------------//
 
     //These you can change:
-    private int predictSteps = 10;
+    private int predictSteps = 20;
 
     //These you can not!
     private SnakeDirection lastDirection;
     private BetterMap betterMap;
     private String url;
     private ArrayList<Long> timers = new ArrayList<>();
+    private int turns = 0;
 
     class WrapInt {
         public int value;
@@ -156,8 +157,8 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
         MaximalTriangle tri = new MaximalTriangle();
         Rectangle rectangle = tri.maximalTriangle(betterMap);
 
-        System.out.println("Biggest rectangle at (" + rectangle.x + ", " + rectangle.y + ")" +
-                "     With an area of: " + rectangle.area);
+        //System.out.println("Biggest rectangle at (" + rectangle.x + ", " + rectangle.y + ")" +
+        //        "     With an area of: " + rectangle.area);
 
         long stopTimer = System.currentTimeMillis();
         timers.add(stopTimer-startTimer);
@@ -165,6 +166,7 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
         //System.out.println("Response time: " + (stopTimer-startTimer));
 
         registerMove(mapUpdateEvent.getGameTick(), chosenDirection);
+        turns++;
         lastDirection = chosenDirection;
     }
 
@@ -196,6 +198,7 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
         }
         long average = tot / timers.size();
         LOGGER.info("Average response time: " + average);
+        System.out.println("Number of turns " + turns);
     }
 
     @Override

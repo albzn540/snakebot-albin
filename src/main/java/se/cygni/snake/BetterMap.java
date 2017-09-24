@@ -172,7 +172,7 @@ public class BetterMap {
         return mapUtil.listCoordinatesContainingFood();
     }
 
-    private void setCell(MapCoordinate coordinate, CellThing thing) {
+    public void setCell(MapCoordinate coordinate, CellThing thing) {
         map[coordinate.x][coordinate.y] = thing;
     }
 

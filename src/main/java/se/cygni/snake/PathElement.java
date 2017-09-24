@@ -23,6 +23,8 @@ public class PathElement {
             if(depth < betterMap.predictedMapStep)
                 betterMap.advancePrediction();
 
+            betterMap.setCell(currentCoordinate, BetterMap.CellThing.OBSTACLE);
+
             for (HashMap.Entry<SnakeDirection, MapCoordinate> child : dirAndNewPos.entrySet()) {
                 childs.add(new PathElement(
                         child.getKey(),
