@@ -6,16 +6,17 @@ import org.springframework.util.concurrent.ListenableFuture;
 import org.springframework.web.socket.WebSocketSession;
 import se.cygni.snake.api.event.*;
 import se.cygni.snake.api.exception.InvalidPlayerName;
-import se.cygni.snake.api.model.*;
+import se.cygni.snake.api.model.GameMode;
+import se.cygni.snake.api.model.GameSettings;
+import se.cygni.snake.api.model.PlayerPoints;
+import se.cygni.snake.api.model.SnakeDirection;
 import se.cygni.snake.api.response.PlayerRegistered;
 import se.cygni.snake.api.util.GameSettingsUtils;
 import se.cygni.snake.client.AnsiPrinter;
 import se.cygni.snake.client.BaseSnakeClient;
-import se.cygni.snake.client.MapCoordinate;
 import se.cygni.snake.client.MapUtil;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 
 public class SimpleSnakePlayer extends BaseSnakeClient {
@@ -36,6 +37,7 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
     private static final boolean ANSI_PRINTER_ACTIVE = false;
     private AnsiPrinter ansiPrinter = new AnsiPrinter(ANSI_PRINTER_ACTIVE, true);
 
+<<<<<<< HEAD
     //-------------------------------------- Own Stuff ----------------------------------------------//
 
     //These you can change:
@@ -61,6 +63,8 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
         }
     }
 
+=======
+>>>>>>> parent of 9b38ddf... PathElement
     public static void main(String[] args) {
         SimpleSnakePlayer simpleSnakePlayer = new SimpleSnakePlayer();
 
@@ -104,6 +108,7 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
 
         // MapUtil contains lot's of useful methods for querying the map!
         MapUtil mapUtil = new MapUtil(mapUpdateEvent.getMap(), getPlayerId());
+<<<<<<< HEAD
         betterMap = new BetterMap(mapUpdateEvent.getMap(), getPlayerId());
         betterMap.maxPredictSteps = predictSteps;
 
@@ -160,7 +165,26 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
         timers.add(stopTimer-startTimer);
         //System.out.println("Chosen dir: " + chosenDirection + "          Walkdist: " + biggestYet);
         //System.out.println("Response time: " + (stopTimer-startTimer));
+=======
 
+        //will hold the available absolute snake directions
+        List<SnakeDirection> directions = new ArrayList<>();
+
+        // Let's see in which directions I can move
+        for (SnakeDirection direction : SnakeDirection.values()) {
+            if (mapUtil.canIMoveInDirection(direction)) {
+                directions.add(direction);
+            }
+        }
+        Random r = new Random();
+        SnakeDirection chosenDirection = SnakeDirection.DOWN;
+
+        // Choose a random direction
+        if (!directions.isEmpty())
+            chosenDirection = directions.get(r.nextInt(directions.size()));
+>>>>>>> parent of 9b38ddf... PathElement
+
+        // Register action here!
         registerMove(mapUpdateEvent.getGameTick(), chosenDirection);
         turns++;
         lastDirection = chosenDirection;
