@@ -151,8 +151,6 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
             index++;
         }
 
-        System.out.println("Biggest yet: " +biggestYet);
-
         SnakeDirection chosenDirection = lastDirection;
 
         int currentIndex = 0;

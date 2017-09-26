@@ -13,10 +13,6 @@ public class PathElement {
     public MapCoordinate currentCoordinate;                    //Unique for every three
 
     public PathElement(SnakeDirection dir, MapCoordinate currentCoordinate, BetterMap betterMap, int depth, SimpleSnakePlayer.WrapInt sizePointer){
-        lel(dir, currentCoordinate, betterMap, depth, sizePointer);
-    }
-
-    private void lel(SnakeDirection dir, MapCoordinate currentCoordinate, BetterMap betterMap, int depth, SimpleSnakePlayer.WrapInt sizePointer) {
         direction = dir;
         sizePointer.increment();
 
