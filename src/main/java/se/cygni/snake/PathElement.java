@@ -44,7 +44,7 @@ public class PathElement {
     }
 
     private void constructorHelper(SnakeDirection dir, MapCoordinate currentCoordinate, BetterMap betterMap, int currentDepth, PathElement root) {
-        currentMap = betterMap.copy(betterMap);
+        currentMap = betterMap.copy();
 
         direction = dir; //does not change, don't need to clone
         pathOptions = new ArrayList<>();
@@ -74,7 +74,7 @@ public class PathElement {
         }
 
         //calc dist to enemies.
-        distToEnemies = calcShortestDistToEnemies();
+        //distToEnemies = calcShortestDistToEnemies();
     }
 
     /**
@@ -98,11 +98,11 @@ public class PathElement {
     private boolean checkPossibleMoves() {
         //Check available moves THIS round (for the NEXT round).
         HashMap<SnakeDirection, MapCoordinate> dirAndNewPos = currentMap.availableMoves(currentCoordinate);
-        currentMap.setCell(currentCoordinate, BetterMap.CellThing.HEAD);
 
         if(dirAndNewPos.isEmpty()) return false;
 
         for (HashMap.Entry<SnakeDirection, MapCoordinate> option : dirAndNewPos.entrySet()) {
+
             pathOptions.add(new PathElement(
                     option.getKey(),
                     option.getValue(),

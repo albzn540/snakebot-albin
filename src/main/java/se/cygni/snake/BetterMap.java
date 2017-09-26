@@ -39,8 +39,8 @@ public class BetterMap {
 
     public MapUpdateEvent mapUpdateEvent;
     public CellThing[][] map;
-    public int currentMapStep = 0;
-    public int maxPredictSteps = 10; //but is primarily set in SimpleSnakePlayer class
+    public int currentMapStep;
+    public int maxPredictSteps; //but is primarily set in SimpleSnakePlayer class
     public List<MapCoordinate[]> otherSnakes = new ArrayList<>();
 
     private MapUtil mapUtil;
@@ -67,27 +67,30 @@ public class BetterMap {
             }
         }
 
+        currentMapStep = 0;
+
         //Import food, obstacles, other snakes(head, body) and lastly own body
         //Sets remaining to empty
         importFromMapUtil();
     }
 
-    public BetterMap copy(BetterMap oldMap) {
+    public BetterMap copy() {
         BetterMap newMap = new BetterMap();
 
         //copy content
-        newMap.mapHeight = oldMap.mapHeight;
-        newMap.mapWidth = oldMap.mapWidth;
-        newMap.currentMapStep = oldMap.currentMapStep;
-        newMap.playerID = oldMap.playerID;
+        newMap.mapHeight = mapHeight;
+        newMap.mapWidth = mapWidth;
+        newMap.currentMapStep = currentMapStep;
+        newMap.maxPredictSteps = maxPredictSteps;
+        newMap.playerID = playerID;
 
-        newMap.mapUtil = oldMap.mapUtil;
+        newMap.mapUtil = mapUtil;
         newMap.map = new CellThing[mapWidth][mapHeight];
 
         //coppy shitty map-shitt
         for(int x = 0; x < mapWidth; x++) {
             for(int y = 0; y < mapHeight; y++) {
-                newMap.map[x][y] = oldMap.map[x][y];
+                newMap.map[x][y] = map[x][y];
             }
         }
 
@@ -148,21 +151,24 @@ public class BetterMap {
                     map[x][y] = CellThing.ENEMYSNAKE;           //ta i åtanke att de kan dö? och att de försvinner då?
 
                     //have to check if its safe to go to before moving
-                    MapCoordinate newPos = new MapCoordinate(x+1,y);
+                    MapCoordinate newPos = new MapCoordinate(x,y);
+                    MapCoordinate pos = null;
+
+                    pos = newPos.translateBy(1,0);
                     if(isTileAvailableForMovementTo(newPos))
                         setCell(newPos, CellThing.ENEMYHEAD);
 
-                    newPos = new MapCoordinate(x,y+1);
-                    if(isTileAvailableForMovementTo(newPos))
-                        setCell(newPos, CellThing.ENEMYHEAD);
+                    pos = newPos.translateBy(0,1);
+                    if(isTileAvailableForMovementTo(pos))
+                        setCell(pos, CellThing.ENEMYHEAD);
 
-                    newPos = new MapCoordinate(x-1,y);
-                    if(isTileAvailableForMovementTo(newPos))
-                        setCell(newPos, CellThing.ENEMYHEAD);
+                    pos = newPos.translateBy(-1,0);
+                    if(isTileAvailableForMovementTo(pos))
+                        setCell(pos, CellThing.ENEMYHEAD);
 
-                    newPos = new MapCoordinate(x,y-1);
-                    if(isTileAvailableForMovementTo(newPos))
-                        setCell(newPos, CellThing.ENEMYHEAD);
+                    pos = newPos.translateBy(0,-1);
+                    if(isTileAvailableForMovementTo(pos))
+                        setCell(pos, CellThing.ENEMYHEAD);
                 }
             }
         }

@@ -17,9 +17,9 @@ import se.cygni.snake.client.BaseSnakeClient;
 import se.cygni.snake.client.MapCoordinate;
 import se.cygni.snake.client.MapUtil;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 
 public class SimpleSnakePlayer extends BaseSnakeClient {
 
@@ -33,7 +33,7 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
     private static  final int SERVER_PORT = 80;
 
     private static final GameMode GAME_MODE = GameMode.TRAINING;
-    private static final String SNAKE_NAME = "The Simple Snake";
+    private static final String SNAKE_NAME = "Albin";
 
     // Set to false if you don't want the game world printed every game tick.
     private static final boolean ANSI_PRINTER_ACTIVE = false;
@@ -42,8 +42,8 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
     //-------------------------------------- Own Stuff ----------------------------------------------//
 
     //These you can change:
-    private int predictSteps = 20;
-    private int distToEnemiesDepth = 10;
+    private int predictSteps = 10;
+    private int distToEnemiesDepth = 2;
 
     //These you can not!
     private SnakeDirection chosenDirection;
@@ -110,6 +110,7 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
         int id = 0; //assign an id to every option
         for (HashMap.Entry<SnakeDirection, MapCoordinate> entry : dirAndNewPos.entrySet()) {
             betterMap = new BetterMap(mapUpdateEvent.getMap(), getPlayerId());
+            betterMap.maxPredictSteps = predictSteps;
 
             // each one on new thread? YESS, I think the bruteforce method WITH duplications is better
             pathOptions.add(new PathElement(
@@ -123,8 +124,25 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
         //Print PathOptions
         int nr = 0;
         for(PathElement option : pathOptions) {
-            System.out.print(option.id + ": " + option.direction +
-                ", Number of sub-options: " + option.pathOptions.size() + "\n");
+            System.out.print(option.id + ": " + option.direction);
+            //System.out.println(", new Pos: " + option.currentCoordinate.toString());
+            System.out.print(", Sub-options: " + option.pathOptions.size());
+            System.out.print(", nodes: " + option.nodes);
+
+            int sum = 0;
+            for (Integer tile : option.enemyTiles) {
+                sum += tile;
+            }
+            sum /= option.enemyTiles.size();
+            System.out.print(", Average Enemy tiles: " + sum);
+
+            for (Integer tile : option.ownTiles) {
+                sum += tile;
+            }
+            sum /= option.ownTiles.size();
+            System.out.print(", Average Own tiles: " + sum);
+
+            System.out.print("\n");
             nr++;
         }
 
