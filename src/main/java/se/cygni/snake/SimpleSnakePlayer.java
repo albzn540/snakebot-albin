@@ -6,10 +6,7 @@ import org.springframework.util.concurrent.ListenableFuture;
 import org.springframework.web.socket.WebSocketSession;
 import se.cygni.snake.api.event.*;
 import se.cygni.snake.api.exception.InvalidPlayerName;
-import se.cygni.snake.api.model.GameMode;
-import se.cygni.snake.api.model.GameSettings;
-import se.cygni.snake.api.model.PlayerPoints;
-import se.cygni.snake.api.model.SnakeDirection;
+import se.cygni.snake.api.model.*;
 import se.cygni.snake.api.response.PlayerRegistered;
 import se.cygni.snake.api.util.GameSettingsUtils;
 import se.cygni.snake.client.AnsiPrinter;
@@ -17,9 +14,10 @@ import se.cygni.snake.client.BaseSnakeClient;
 import se.cygni.snake.client.MapCoordinate;
 import se.cygni.snake.client.MapUtil;
 
-import java.nio.file.Path;
+import java.lang.reflect.Array;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Collections;
+import java.util.Comparator;
 
 public class SimpleSnakePlayer extends BaseSnakeClient {
 
@@ -42,15 +40,19 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
     //-------------------------------------- Own Stuff ----------------------------------------------//
 
     //These you can change:
-    private int predictSteps = 10;
-    private int distToEnemiesDepth = 2;
+    //Change max predictsteps in PathElement!
 
     //These you can not!
     private SnakeDirection chosenDirection;
-    private BetterMap betterMap;
     private String url;
     private ArrayList<Long> timers = new ArrayList<>();
-    private int turns;
+    private int turns = 0;
+
+    private MapCoordinate[] obstacles;
+    private ArrayList<MapCoordinate> enemies;
+    private ArrayList<MapCoordinate> enemyHeads;
+    private ArrayList<MapCoordinate> self;
+    private MapUtil mapUtil;
 
 
     public static void main(String[] args) {
@@ -98,42 +100,97 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
         ansiPrinter.printMap(mapUpdateEvent);
 
         // MapUtil contains lot's of useful methods for querying the map!
-        MapUtil mapUtil = new MapUtil(mapUpdateEvent.getMap(), getPlayerId());
-        BetterMap betterMap = new BetterMap(mapUpdateEvent.getMap(), getPlayerId());
-        betterMap.maxPredictSteps = predictSteps;
+        mapUtil = new MapUtil(mapUpdateEvent.getMap(), getPlayerId());
 
-        // Let's see in which directions I can move
-        HashMap<SnakeDirection, MapCoordinate> dirAndNewPos = betterMap.availableMoves(mapUtil.getMyPosition());
-        // Array with the path options
+        // import from mapUtil
+        enemies = new ArrayList<>();
+        enemyHeads = new ArrayList<>();
+        self = new ArrayList<>();
+
+        //Get other snake id's and spread
+        ArrayList<MapCoordinate[]> otherSnakes = new ArrayList<>();
+        SnakeInfo[] snakesInfo = mapUpdateEvent.getMap().getSnakeInfos();
+        for(int i = 0; i < snakesInfo.length; i++) {
+            String id = snakesInfo[i].getId();
+            if(!id.equals(getPlayerId()) && snakesInfo[i].isAlive()) {
+                enemyHeads.add(mapUtil.getSnakeSpread(id)[0]);
+                for (MapCoordinate coordinate : mapUtil.getSnakeSpread(id)) {
+                    enemies.add(coordinate);
+                }
+            }
+        }
+
+        // get own snakespread
+        for (MapCoordinate coordinate : mapUtil.getSnakeSpread(getPlayerId())) {
+            self.add(coordinate);
+        }
+
+        obstacles = mapUtil.listCoordinatesContainingObstacle();
+
+        MapCoordinate pos = mapUtil.getMyPosition();
+        MapCoordinate newPos = mapUtil.getMyPosition();
+
         ArrayList<PathElement> pathOptions = new ArrayList<>();
 
-        int id = 0; //assign an id to every option
-        for (HashMap.Entry<SnakeDirection, MapCoordinate> entry : dirAndNewPos.entrySet()) {
-            betterMap = new BetterMap(mapUpdateEvent.getMap(), getPlayerId());
-            betterMap.maxPredictSteps = predictSteps;
+        int id = 0;
+        for(SnakeDirection direction : SnakeDirection.values()) {
+            SnakeDirection newDir = null;
+            switch (direction){
+                case UP:
+                    newPos = pos.translateBy(0, -1);
+                    newDir = SnakeDirection.UP;
+                    break;
+                case DOWN:
+                    newPos = pos.translateBy(0, 1);
+                    newDir = SnakeDirection.DOWN;
+                    break;
+                case LEFT:
+                    newPos = pos.translateBy(-1, 0);
+                    newDir = SnakeDirection.LEFT;
+                    break;
+                case RIGHT:
+                    newPos = pos.translateBy(1, 0);
+                    newDir = SnakeDirection.RIGHT;
+                    break;
+            }
 
-            // each one on new thread? YESS, I think the bruteforce method WITH duplications is better
-            pathOptions.add(new PathElement(
-                    entry.getKey(),
-                    entry.getValue(),
-                    betterMap,
-                    id));
+            if(safeTile(newPos))
+                pathOptions.add(new PathElement(
+                                    newDir,
+                                    newPos,
+                                    new ArrayList<>(enemies),
+                                    new ArrayList<>(enemyHeads),
+                                    new ArrayList<>(self),
+                                    id,
+                                    mapUtil));
             id++;
         }
+
+        Collections.sort(pathOptions, new Comparator<PathElement>() {
+            @Override
+            public int compare(PathElement o1, PathElement o2) {
+                if(o1.nodes < o2.nodes) //biggest one first
+                    return 1;
+                if(o1.nodes == o2.nodes)
+                    return 0;
+                return -1;
+            }
+        });
+
+        chosenDirection = pathOptions.get(0).direction; //choose the one with the most nodes
 
         //Print PathOptions
         int nr = 0;
         for(PathElement option : pathOptions) {
             System.out.print(option.id + ": " + option.direction);
-            //System.out.println(", new Pos: " + option.currentCoordinate.toString());
-            System.out.print(", Sub-options: " + option.pathOptions.size());
+            //System.out.println(", new Pos: " + option.head.toString());
             System.out.print(", nodes: " + option.nodes);
 
             int sum = 0;
             for (Integer tile : option.enemyTiles) {
                 sum += tile;
             }
-            sum /= option.enemyTiles.size();
+            sum /= option.root.enemyTiles.size();
             System.out.print(", Average Enemy tiles: " + sum);
 
             for (Integer tile : option.ownTiles) {
@@ -142,9 +199,17 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
             sum /= option.ownTiles.size();
             System.out.print(", Average Own tiles: " + sum);
 
+            for (Integer tile : option.distToEnemies) {
+                sum += tile;
+            }
+            sum /= option.distToEnemies.size();
+            System.out.print(", Average dist to enemies: " + sum);
+
             System.out.print("\n");
             nr++;
         }
+
+
 
         // Register action here!
         registerMove(mapUpdateEvent.getGameTick(), chosenDirection);
@@ -259,5 +324,34 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
     @Override
     public GameMode getGameMode() {
         return GAME_MODE;
+    }
+
+    private boolean safeTile(MapCoordinate coordinate) {
+        boolean res = true;
+        // check obstacles
+        for (MapCoordinate obstacle : obstacles){
+            if(coordinate.equals(obstacle)) {
+                res = false;
+                break;
+            }
+        }
+
+        // check enemies
+        for (MapCoordinate enemy : enemies){
+            if(coordinate.equals(enemy)) {
+                res = false;
+                break;
+            }
+        }
+
+        //check self
+        for (MapCoordinate me : self){
+            if(coordinate.equals(me)) {
+                res = false;
+                break;
+            }
+        }
+
+        return !mapUtil.isCoordinateOutOfBounds(coordinate) && res;
     }
 }
