@@ -6,6 +6,9 @@ import se.cygni.snake.client.MapCoordinate;
 import se.cygni.snake.client.MapUtil;
 
 import java.util.ArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class PathElement {
     // -------- Settings -------//
@@ -97,6 +100,8 @@ public class PathElement {
 
             currentDepth++;
 
+            ExecutorService executor = Executors.newFixedThreadPool(3);
+
             for(SnakeDirection direction : SnakeDirection.values()) {
                 MapCoordinate newPos = head;
                 SnakeDirection newDir = null;
@@ -118,15 +123,33 @@ public class PathElement {
                         newDir = SnakeDirection.RIGHT;
                         break;
                 }
-                if(safeTile(newPos))
-                    new PathElement(
-                            newDir,
-                            newPos,
-                            new ArrayList<>(enemies),
-                            new ArrayList<>(enemyHeads),
-                            new ArrayList<>(self),
-                            currentDepth,
-                            root);
+                if(safeTile(newPos)) {
+                    MapCoordinate newPos1 = newPos;
+                    SnakeDirection newDir1 = newDir;
+                    int currentDepth1 = currentDepth;
+
+                    executor.submit(new Runnable() {
+                        @Override
+                        public void run() {
+                            new PathElement(
+                                    newDir1,
+                                    newPos1,
+                                    new ArrayList<>(enemies),
+                                    new ArrayList<>(enemyHeads),
+                                    new ArrayList<>(self),
+                                    currentDepth1,
+                                    root);
+
+                        }
+                    });
+                }
+
+            }
+            executor.shutdown();
+            try {
+                executor.awaitTermination(180-currentDepth, TimeUnit.MILLISECONDS);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
             }
 
         } else {

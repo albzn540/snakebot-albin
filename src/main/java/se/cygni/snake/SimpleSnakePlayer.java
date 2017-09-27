@@ -15,9 +15,7 @@ import se.cygni.snake.client.MapCoordinate;
 import se.cygni.snake.client.MapUtil;
 
 import java.lang.reflect.Array;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
+import java.util.*;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -135,6 +133,8 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
         MapCoordinate newPos = mapUtil.getMyPosition();
 
         ArrayList<PathElement> pathOptions = new ArrayList<>();
+        List<PathElement> syncedList = Collections.synchronizedList(pathOptions);
+
         ArrayList<SnakeDirection> availableDirections = new ArrayList<>();
 
         for (SnakeDirection direction : SnakeDirection.values()) {
@@ -174,7 +174,7 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
                 @Override
                 public void run() {
                     if(safeTile(newPos1))
-                        pathOptions.add(new PathElement(
+                        syncedList.add(new PathElement(
                                 newDir1,
                                 newPos1,
                                 new ArrayList<>(enemies),
@@ -186,6 +186,8 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
             });
             id++;
         }
+
+
 
         executor.shutdown();
         try {
@@ -218,19 +220,25 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
             for (Integer tile : option.enemyTiles) {
                 sum += tile;
             }
-            sum /= option.root.enemyTiles.size();
+            if(option.enemyTiles.size() == 0)
+                sum = 0;
+            else sum /= option.root.enemyTiles.size();
             System.out.print(", Average Enemy tiles: " + sum);
 
             for (Integer tile : option.ownTiles) {
                 sum += tile;
             }
-            sum /= option.ownTiles.size();
+            if(option.ownTiles.size() == 0)
+                sum = 0;
+            else sum /= option.ownTiles.size();
             System.out.print(", Average Own tiles: " + sum);
 
             for (Integer tile : option.distToEnemies) {
                 sum += tile;
             }
-            sum /= option.distToEnemies.size();
+            if(option.distToEnemies.size() == 0)
+                sum = 0;
+            else sum /= option.distToEnemies.size();
             System.out.print(", Average dist to enemies: " + sum);
 
             System.out.print("\n");
