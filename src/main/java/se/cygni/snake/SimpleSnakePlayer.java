@@ -255,7 +255,7 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
                 System.out.println("Can't do shitt, your'e surrounded");
             else if(index == newDir.size())
                 chosenDirection = newDir.get(0);
-            chosenDirection = newDir.get(index);
+            else chosenDirection = newDir.get(index);
         }
 
 
@@ -296,7 +296,7 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
             System.out.print("\n");
             nr++;
         }
-        
+
         // Register action here!
         registerMove(mapUpdateEvent.getGameTick(), chosenDirection);
         System.out.print("Chosen direction: " + chosenDirection);
