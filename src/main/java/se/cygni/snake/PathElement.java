@@ -1,22 +1,18 @@
 package se.cygni.snake;
 
-import com.sun.xml.internal.bind.v2.TODO;
-import org.apache.commons.math3.random.RandomAdaptor;
 import se.cygni.snake.api.model.SnakeDirection;
 import se.cygni.snake.client.MapCoordinate;
 import se.cygni.snake.client.MapUtil;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 public class PathElement {
     // -------- Settings -------//
-    private int maxPredictSteps = 10;           //how far we will predict
-    private int maxEnemyDistCalcStep = 5;       //how far we will count total enemy distance
+    private int maxPredictSteps = 150;           //how far we will predict
+    private int maxEnemyDistCalcStep = 20;       //how far we will count total enemy distance
 
     /**
      * NOTE! "Obstacle" Counts as "obstacle", "other snakes" and "own snake body".
@@ -46,13 +42,18 @@ public class PathElement {
 
 
     //Root constructor
-    public PathElement(SnakeDirection dir, MapCoordinate head, ArrayList<MapCoordinate> enemies, ArrayList<MapCoordinate> enemyHeads, ArrayList<MapCoordinate> self, int id, MapUtil mapUtil) {
+    public PathElement(SnakeDirection dir, MapCoordinate head, ArrayList<MapCoordinate> enemies, ArrayList<MapCoordinate> enemyHeads, ArrayList<MapCoordinate> self, int id, MapUtil mapUtil, int snakesAlive) {
         this.id = id;
         this.mapUtil = mapUtil;
         this.obstacles = new ArrayList<>();
         enemyTiles = new ArrayList<>();
         ownTiles = new ArrayList<>();
         distToEnemies = new ArrayList<>();
+
+        if(snakesAlive == 2) {
+            maxPredictSteps = 200;
+        }
+
         for (MapCoordinate coordinate : mapUtil.listCoordinatesContainingObstacle()) {
             this.obstacles.add(coordinate);
         }
@@ -104,12 +105,13 @@ public class PathElement {
             currentDepth++;
 
             ExecutorService executor = Executors.newFixedThreadPool(3);
-            HashMap<SnakeDirection, MapCoordinate> dirAndPos = new HashMap<>();
+            ArrayList<SnakeDirection> dirlist = new ArrayList<>();
+            ArrayList<MapCoordinate> poslist = new ArrayList<>();
             Random rnd = new Random();
             MapCoordinate newPos = head;
             SnakeDirection newDir = null;
 
-            for(SnakeDirection direction : SnakeDirection.values()) {
+            for (SnakeDirection direction : SnakeDirection.values()) {
                 switch (direction) {
                     case UP:
                         newPos = head.translateBy(0, -1);
@@ -128,25 +130,26 @@ public class PathElement {
                         newDir = SnakeDirection.RIGHT;
                         break;
                 }
-                if (safeTile(newPos))
-                    dirAndPos.put(newDir, newPos);
+                if (safeTile(newPos)) {
+                    dirlist.add(newDir);
+                    poslist.add(newPos);
+                }
             }
 
-            newPos = dirAndPos.get(rnd.nextInt(dirAndPos.size()));
-            newDir = null;
-            new PathElement(
-                    newDir,
-                    newPos,
-                    new ArrayList<>(enemies),
-                    new ArrayList<>(enemyHeads),
-                    new ArrayList<>(self),
-                    currentDepth,
-                    root);
-
-
-        } else {
-            root.enemyTiles.add(enemies.size());
-            root.ownTiles.add(self.size());
+            if (!dirlist.isEmpty()) {
+                int index = rnd.nextInt(dirlist.size());
+                new PathElement(
+                        dirlist.get(index),
+                        poslist.get(index),
+                        new ArrayList<>(enemies),
+                        new ArrayList<>(enemyHeads),
+                        new ArrayList<>(self),
+                        currentDepth,
+                        root);
+            } else {
+                root.enemyTiles.add(enemies.size());
+                root.ownTiles.add(self.size());
+            }
         }
 
         // calc distance to enemies

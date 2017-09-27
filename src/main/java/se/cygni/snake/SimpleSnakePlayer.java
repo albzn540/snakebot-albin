@@ -9,10 +9,7 @@ import se.cygni.snake.api.exception.InvalidPlayerName;
 import se.cygni.snake.api.model.*;
 import se.cygni.snake.api.response.PlayerRegistered;
 import se.cygni.snake.api.util.GameSettingsUtils;
-import se.cygni.snake.client.AnsiPrinter;
-import se.cygni.snake.client.BaseSnakeClient;
-import se.cygni.snake.client.MapCoordinate;
-import se.cygni.snake.client.MapUtil;
+import se.cygni.snake.client.*;
 
 import java.util.*;
 import java.util.concurrent.ExecutorService;
@@ -31,7 +28,7 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
     private static  final int SERVER_PORT = 80;
 
     private static final GameMode GAME_MODE = GameMode.TRAINING;
-    private static final String SNAKE_NAME = "Albin";
+    private static final String SNAKE_NAME = "Wow";
 
     // Set to false if you don't want the game world printed every game tick.
     private static final boolean ANSI_PRINTER_ACTIVE = false;
@@ -47,6 +44,7 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
     private String url;
     private ArrayList<Long> timers = new ArrayList<>();
     private int turns = 0;
+    private int failsafes = 0;
 
     private MapCoordinate[] obstacles;
     private ArrayList<MapCoordinate> enemies;
@@ -93,10 +91,7 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
 
     @Override
     public void onMapUpdate(MapUpdateEvent mapUpdateEvent) {
-
-        System.out.println("------------------- Turn " + turns + " -----------------------");
         long startTimer = System.currentTimeMillis();
-
         ansiPrinter.printMap(mapUpdateEvent);
 
         // MapUtil contains lot's of useful methods for querying the map!
@@ -107,18 +102,27 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
         enemyHeads = new ArrayList<>();
         self = new ArrayList<>();
 
+        int snakesAlive = 0;
+        int points = 0;
+
         //Get other snake id's and spread
         ArrayList<MapCoordinate[]> otherSnakes = new ArrayList<>();
         SnakeInfo[] snakesInfo = mapUpdateEvent.getMap().getSnakeInfos();
         for(int i = 0; i < snakesInfo.length; i++) {
             String id = snakesInfo[i].getId();
+            if(id.equals(getPlayerId())) {
+                points = snakesInfo[i].getPoints();
+            }
             if(!id.equals(getPlayerId()) && snakesInfo[i].isAlive()) {
+                snakesAlive++;
                 enemyHeads.add(mapUtil.getSnakeSpread(id)[0]);
                 for (MapCoordinate coordinate : mapUtil.getSnakeSpread(id)) {
                     enemies.add(coordinate);
                 }
             }
         }
+
+        System.out.println("------------------- Turn " + turns + " ------- Points: " + points + " -----------------------");
 
         // get own snakespread
         for (MapCoordinate coordinate : mapUtil.getSnakeSpread(getPlayerId())) {
@@ -127,122 +131,172 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
 
         obstacles = mapUtil.listCoordinatesContainingObstacle();
 
-        MapCoordinate pos = mapUtil.getMyPosition();
-        MapCoordinate newPos = mapUtil.getMyPosition();
-
         ArrayList<PathElement> pathOptions = new ArrayList<>();
         List<PathElement> syncedList = Collections.synchronizedList(pathOptions);
 
         ArrayList<SnakeDirection> availableDirections = new ArrayList<>();
+        ExecutorService executor = Executors.newFixedThreadPool(10);
 
         for (SnakeDirection direction : SnakeDirection.values()) {
             if(mapUtil.canIMoveInDirection(direction))
                     availableDirections.add(direction);
         }
 
-        ExecutorService executor = Executors.newFixedThreadPool(availableDirections.size());
-
-        int id = 0;
-        for(SnakeDirection direction : availableDirections) {
-            SnakeDirection newDir = null;
-            switch (direction){
-                case UP:
-                    newPos = pos.translateBy(0, -1);
-                    newDir = SnakeDirection.UP;
-                    break;
-                case DOWN:
-                    newPos = pos.translateBy(0, 1);
-                    newDir = SnakeDirection.DOWN;
-                    break;
-                case LEFT:
-                    newPos = pos.translateBy(-1, 0);
-                    newDir = SnakeDirection.LEFT;
-                    break;
-                case RIGHT:
-                    newPos = pos.translateBy(1, 0);
-                    newDir = SnakeDirection.RIGHT;
-                    break;
-            }
-
-            int a = id;
-            MapCoordinate newPos1 = newPos;
-            SnakeDirection newDir1 = newDir;
-
+        final int snakesAlive1 = snakesAlive;
+        for (int i = 0; i < 70; i++) {
             executor.submit(new Runnable() {
+                MapCoordinate pos = mapUtil.getMyPosition();
+                MapCoordinate newPos = mapUtil.getMyPosition();
                 @Override
                 public void run() {
-                    if(safeTile(newPos1))
-                        syncedList.add(new PathElement(
-                                newDir1,
-                                newPos1,
-                                new ArrayList<>(enemies),
-                                new ArrayList<>(enemyHeads),
-                                new ArrayList<>(self),
-                                a,
-                                mapUtil));
+                    for(SnakeDirection direction : availableDirections) {
+                        SnakeDirection newDir = null;
+                        switch (direction){
+                            case UP:
+                                newPos = pos.translateBy(0, -1);
+                                newDir = SnakeDirection.UP;
+                                break;
+                            case DOWN:
+                                newPos = pos.translateBy(0, 1);
+                                newDir = SnakeDirection.DOWN;
+                                break;
+                            case LEFT:
+                                newPos = pos.translateBy(-1, 0);
+                                newDir = SnakeDirection.LEFT;
+                                break;
+                            case RIGHT:
+                                newPos = pos.translateBy(1, 0);
+                                newDir = SnakeDirection.RIGHT;
+                                break;
+                        }
+
+                        if(safeTile(newPos))
+                            syncedList.add(new PathElement(
+                                    newDir,
+                                    newPos,
+                                    new ArrayList<>(enemies),
+                                    new ArrayList<>(enemyHeads),
+                                    new ArrayList<>(self),
+                                    0,
+                                    mapUtil,
+                                    snakesAlive1));
+
+                    }
                 }
             });
-            id++;
         }
 
         executor.shutdown();
         try {
-            executor.awaitTermination(180, TimeUnit.MILLISECONDS);
+            executor.awaitTermination(100, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
 
-        Collections.sort(pathOptions, new Comparator<PathElement>() {
-            @Override
-            public int compare(PathElement o1, PathElement o2) {
-                if(o1.nodes < o2.nodes) //biggest one first
-                    return 1;
-                if(o1.nodes == o2.nodes)
-                    return 0;
-                return -1;
-            }
-        });
+        if(!pathOptions.isEmpty()) {
+            Collections.sort(syncedList, new Comparator<PathElement>() {
+                @Override
+                public int compare(PathElement o1, PathElement o2) {
+                    if(o1.nodes < o2.nodes) //biggest one first
+                        return 1;
+                    if(o1.nodes == o2.nodes)
+                        return 0;
+                    return -1;
+                }
+            });
 
-        chosenDirection = pathOptions.get(0).direction; //choose the one with the most nodes
+            //todo Om nodes skiljer sig med bara 10% ska den välja den med längst distToEnemies.
+            chosenDirection = syncedList.get(0).direction; //choose the one with the most nodes
+
+        } else {
+            //Failsafe - Go in direction I can go furthest
+            System.out.println("__________________ FAILSAFE! ___________________");
+            failsafes++;
+
+            ArrayList<SnakeDirection> newDir = new ArrayList<>();
+            ArrayList<Integer> distance = new ArrayList<>();
+
+            for(SnakeDirection dir : availableDirections){
+                switch (dir){
+                    case RIGHT:
+                        distance.add(recursiveDirection(SnakeDirection.RIGHT, mapUtil.getMyPosition()));
+                        newDir.add(SnakeDirection.RIGHT);
+                        break;
+                    case LEFT:
+                        distance.add(recursiveDirection(SnakeDirection.LEFT, mapUtil.getMyPosition()));
+                        newDir.add(SnakeDirection.LEFT);
+                        break;
+                    case DOWN:
+                        distance.add(recursiveDirection(SnakeDirection.DOWN, mapUtil.getMyPosition()));
+                        newDir.add(SnakeDirection.DOWN);
+                        break;
+                    case UP:
+                        distance.add(recursiveDirection(SnakeDirection.UP, mapUtil.getMyPosition()));
+                        newDir.add(SnakeDirection.UP);
+                        break;
+                }
+            }
+
+            System.out.println("NewDir size: " + newDir.size() + ", Distance size: " + distance.size());
+
+
+            int b = 0;
+            int index = 0;
+            int biggestIndex = 0;
+            for(Integer a : distance) {
+                if(a>b) {
+                    b = a;
+                    biggestIndex = index;
+                }
+                index++;
+            }
+
+            if(newDir.size() == 0)
+                System.out.println("Can't do shitt, your'e surrounded");
+            else if(index == newDir.size())
+                chosenDirection = newDir.get(0);
+            chosenDirection = newDir.get(index);
+        }
+
 
         //Print PathOptions
         int nr = 0;
-        for(PathElement option : pathOptions) {
-            System.out.print(option.id + ": " + option.direction);
+        int show = 5;
+        if(pathOptions.size() < show) show = pathOptions.size();
+        for(int i = 0; i < show; i++) {
+            System.out.print(pathOptions.get(i).id + ": " + pathOptions.get(i).direction);
             //System.out.println(", new Pos: " + option.head.toString());
-            System.out.print(", nodes: " + option.nodes);
+            System.out.print(", nodes: " + pathOptions.get(i).nodes);
 
             int sum = 0;
-            for (Integer tile : option.enemyTiles) {
+            for (Integer tile : pathOptions.get(i).enemyTiles) {
                 sum += tile;
             }
-            if(option.enemyTiles.size() == 0)
+            if(pathOptions.get(i).enemyTiles.size() == 0)
                 sum = 0;
-            else sum /= option.root.enemyTiles.size();
+            else sum /= pathOptions.get(i).root.enemyTiles.size();
             System.out.print(", Average Enemy tiles: " + sum);
 
-            for (Integer tile : option.ownTiles) {
+            for (Integer tile : pathOptions.get(i).ownTiles) {
                 sum += tile;
             }
-            if(option.ownTiles.size() == 0)
+            if(pathOptions.get(i).ownTiles.size() == 0)
                 sum = 0;
-            else sum /= option.ownTiles.size();
+            else sum /= pathOptions.get(i).ownTiles.size();
             System.out.print(", Average Own tiles: " + sum);
 
-            for (Integer tile : option.distToEnemies) {
+            for (Integer tile : pathOptions.get(i).distToEnemies) {
                 sum += tile;
             }
-            if(option.distToEnemies.size() == 0)
+            if(pathOptions.get(i).distToEnemies.size() == 0)
                 sum = 0;
-            else sum /= option.distToEnemies.size();
+            else sum /= pathOptions.get(i).distToEnemies.size();
             System.out.print(", Average dist to enemies: " + sum);
 
             System.out.print("\n");
             nr++;
         }
-
-
-
+        
         // Register action here!
         registerMove(mapUpdateEvent.getGameTick(), chosenDirection);
         System.out.print("Chosen direction: " + chosenDirection);
@@ -253,7 +307,7 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
         timers.add(time);
         turns++;
 
-        System.out.print("            ");
+        System.out.print("                               ");
         System.out.println("Response time: " + time +"\n");
     }
 
@@ -287,6 +341,7 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
         long average = tot / timers.size();
         LOGGER.info("Average response time: " + average);
         LOGGER.info("You survived " + turns + " number of turns.");
+        LOGGER.info("Number of failsafes: " + failsafes);
         System.out.println("");
     }
 
@@ -385,5 +440,24 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
         }
 
         return !mapUtil.isCoordinateOutOfBounds(coordinate) && res;
+    }
+
+    private int recursiveDirection(SnakeDirection dir, MapCoordinate coordinate) {
+            switch (dir) {
+                case UP:
+                    coordinate = coordinate.translateBy(0,-1);
+                    break;
+                case DOWN:
+                    coordinate = coordinate.translateBy(0,1);
+                    break;
+                case LEFT:
+                    coordinate = coordinate.translateBy(-1,0);
+                    break;
+                case RIGHT:
+                    coordinate = coordinate.translateBy(1,0);
+                    break;
+            }
+        if(safeTile(coordinate)) return 1 + recursiveDirection(dir, coordinate);
+        return 0;
     }
 }
