@@ -18,6 +18,10 @@ import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class SimpleSnakePlayer extends BaseSnakeClient {
 
@@ -131,9 +135,17 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
         MapCoordinate newPos = mapUtil.getMyPosition();
 
         ArrayList<PathElement> pathOptions = new ArrayList<>();
+        ArrayList<SnakeDirection> availableDirections = new ArrayList<>();
+
+        for (SnakeDirection direction : SnakeDirection.values()) {
+            if(mapUtil.canIMoveInDirection(direction))
+                    availableDirections.add(direction);
+        }
+
+        ExecutorService executor = Executors.newFixedThreadPool(availableDirections.size());
 
         int id = 0;
-        for(SnakeDirection direction : SnakeDirection.values()) {
+        for(SnakeDirection direction : availableDirections) {
             SnakeDirection newDir = null;
             switch (direction){
                 case UP:
@@ -154,16 +166,32 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
                     break;
             }
 
-            if(safeTile(newPos))
-                pathOptions.add(new PathElement(
-                                    newDir,
-                                    newPos,
-                                    new ArrayList<>(enemies),
-                                    new ArrayList<>(enemyHeads),
-                                    new ArrayList<>(self),
-                                    id,
-                                    mapUtil));
+            int a = id;
+            MapCoordinate newPos1 = newPos;
+            SnakeDirection newDir1 = newDir;
+
+            executor.submit(new Runnable() {
+                @Override
+                public void run() {
+                    if(safeTile(newPos1))
+                        pathOptions.add(new PathElement(
+                                newDir1,
+                                newPos1,
+                                new ArrayList<>(enemies),
+                                new ArrayList<>(enemyHeads),
+                                new ArrayList<>(self),
+                                a,
+                                mapUtil));
+                }
+            });
             id++;
+        }
+
+        executor.shutdown();
+        try {
+            executor.awaitTermination(180, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         }
 
         Collections.sort(pathOptions, new Comparator<PathElement>() {
