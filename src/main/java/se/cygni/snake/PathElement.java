@@ -1,11 +1,14 @@
 package se.cygni.snake;
 
 import com.sun.xml.internal.bind.v2.TODO;
+import org.apache.commons.math3.random.RandomAdaptor;
 import se.cygni.snake.api.model.SnakeDirection;
 import se.cygni.snake.client.MapCoordinate;
 import se.cygni.snake.client.MapUtil;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -101,11 +104,13 @@ public class PathElement {
             currentDepth++;
 
             ExecutorService executor = Executors.newFixedThreadPool(3);
+            HashMap<SnakeDirection, MapCoordinate> dirAndPos = new HashMap<>();
+            Random rnd = new Random();
+            MapCoordinate newPos = head;
+            SnakeDirection newDir = null;
 
             for(SnakeDirection direction : SnakeDirection.values()) {
-                MapCoordinate newPos = head;
-                SnakeDirection newDir = null;
-                switch (direction){
+                switch (direction) {
                     case UP:
                         newPos = head.translateBy(0, -1);
                         newDir = SnakeDirection.UP;
@@ -123,34 +128,21 @@ public class PathElement {
                         newDir = SnakeDirection.RIGHT;
                         break;
                 }
-                if(safeTile(newPos)) {
-                    MapCoordinate newPos1 = newPos;
-                    SnakeDirection newDir1 = newDir;
-                    int currentDepth1 = currentDepth;
-
-                    executor.submit(new Runnable() {
-                        @Override
-                        public void run() {
-                            new PathElement(
-                                    newDir1,
-                                    newPos1,
-                                    new ArrayList<>(enemies),
-                                    new ArrayList<>(enemyHeads),
-                                    new ArrayList<>(self),
-                                    currentDepth1,
-                                    root);
-
-                        }
-                    });
-                }
-
+                if (safeTile(newPos))
+                    dirAndPos.put(newDir, newPos);
             }
-            executor.shutdown();
-            try {
-                executor.awaitTermination(180-currentDepth, TimeUnit.MILLISECONDS);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+
+            newPos = dirAndPos.get(rnd.nextInt(dirAndPos.size()));
+            newDir = null;
+            new PathElement(
+                    newDir,
+                    newPos,
+                    new ArrayList<>(enemies),
+                    new ArrayList<>(enemyHeads),
+                    new ArrayList<>(self),
+                    currentDepth,
+                    root);
+
 
         } else {
             root.enemyTiles.add(enemies.size());

@@ -14,9 +14,7 @@ import se.cygni.snake.client.BaseSnakeClient;
 import se.cygni.snake.client.MapCoordinate;
 import se.cygni.snake.client.MapUtil;
 
-import java.lang.reflect.Array;
 import java.util.*;
-import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -186,8 +184,6 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
             });
             id++;
         }
-
-
 
         executor.shutdown();
         try {
