@@ -28,7 +28,7 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
     private static  final int SERVER_PORT = 80;
 
     private static final GameMode GAME_MODE = GameMode.TRAINING;
-    private static final String SNAKE_NAME = "Wow";
+    private static final String SNAKE_NAME = "Johan är en insider";
 
     // Set to false if you don't want the game world printed every game tick.
     private static final boolean ANSI_PRINTER_ACTIVE = false;
