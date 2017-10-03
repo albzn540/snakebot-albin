@@ -11,8 +11,8 @@ import java.util.concurrent.Executors;
 
 public class PathElement {
     // -------- Settings -------//
-    private int maxPredictSteps = 150;           //how far we will predict
-    private int maxEnemyDistCalcStep = 20;       //how far we will count total enemy distance
+    private int maxPredictSteps = 250;           //how far we will predict
+    private int maxEnemyDistCalcStep = 30;       //how far we will count total enemy distance
 
     /**
      * NOTE! "Obstacle" Counts as "obstacle", "other snakes" and "own snake body".

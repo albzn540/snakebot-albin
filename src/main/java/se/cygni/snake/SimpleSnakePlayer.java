@@ -143,7 +143,7 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
         }
 
         final int snakesAlive1 = snakesAlive;
-        for (int i = 0; i < 70; i++) {
+        for (int i = 0; i < 60; i++) {
             executor.submit(new Runnable() {
                 MapCoordinate pos = mapUtil.getMyPosition();
                 MapCoordinate newPos = mapUtil.getMyPosition();
