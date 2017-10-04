@@ -6,13 +6,11 @@ import se.cygni.snake.client.MapUtil;
 
 import java.util.ArrayList;
 import java.util.Random;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 public class PathElement {
     // -------- Settings -------//
-    private int maxPredictSteps = 250;           //how far we will predict
-    private int maxEnemyDistCalcStep = 30;       //how far we will count total enemy distance
+    private int maxPredictSteps = 180;           //how far we will predict
+    private int maxEnemyDistCalcStep = 0;       //how far we will count total enemy distance
 
     /**
      * NOTE! "Obstacle" Counts as "obstacle", "other snakes" and "own snake body".
@@ -28,6 +26,7 @@ public class PathElement {
 
     private ArrayList<MapCoordinate> enemies;
     private ArrayList<MapCoordinate> self;
+    private ArrayList<MapCoordinate> newHeades;
 
     //food?
 
@@ -39,6 +38,7 @@ public class PathElement {
     public ArrayList<Integer> ownTiles;
     public ArrayList<Integer> enemyTiles;
     public ArrayList<Integer> distToEnemies;
+    public int clarity;
 
 
     //Root constructor
@@ -79,7 +79,7 @@ public class PathElement {
         self.add(head);
 
         // predict other snakes last move
-        ArrayList<MapCoordinate> newHeades = new ArrayList<>();
+       newHeades = new ArrayList<>();
         for (MapCoordinate enemy : enemyHeads) {
             MapCoordinate newPos = enemy.translateBy(1,0);
             if(safeTile(newPos))
@@ -104,34 +104,28 @@ public class PathElement {
 
             currentDepth++;
 
-            ExecutorService executor = Executors.newFixedThreadPool(3);
             ArrayList<SnakeDirection> dirlist = new ArrayList<>();
             ArrayList<MapCoordinate> poslist = new ArrayList<>();
             Random rnd = new Random();
             MapCoordinate newPos = head;
-            SnakeDirection newDir = null;
 
             for (SnakeDirection direction : SnakeDirection.values()) {
                 switch (direction) {
                     case UP:
                         newPos = head.translateBy(0, -1);
-                        newDir = SnakeDirection.UP;
                         break;
                     case DOWN:
                         newPos = head.translateBy(0, 1);
-                        newDir = SnakeDirection.DOWN;
                         break;
                     case LEFT:
                         newPos = head.translateBy(-1, 0);
-                        newDir = SnakeDirection.LEFT;
                         break;
                     case RIGHT:
                         newPos = head.translateBy(1, 0);
-                        newDir = SnakeDirection.RIGHT;
                         break;
                 }
                 if (safeTile(newPos)) {
-                    dirlist.add(newDir);
+                    dirlist.add(direction);
                     poslist.add(newPos);
                 }
             }
@@ -147,10 +141,62 @@ public class PathElement {
                         currentDepth,
                         root);
             } else {
-                root.enemyTiles.add(enemies.size());
-                root.ownTiles.add(self.size());
+                reachedEnd();
             }
         }
+        else {
+            reachedEnd();
+        }
+        //long start = System.currentTimeMillis();
+        //calc clarity
+        //straight line
+        ArrayList<SnakeDirection> dirlist = new ArrayList<>();
+        ArrayList<MapCoordinate> poslist = new ArrayList<>();
+        MapCoordinate newPos = head;
+
+        for (SnakeDirection direction : SnakeDirection.values()) {
+            switch (direction) {
+                case UP:
+                    newPos = head.translateBy(0, -1);
+                    for(int i = 0; i < 50; i++) {
+                        if(safeTile(newPos)) {
+                            root.clarity++;
+                            newPos = newPos.translateBy(0,-1);
+                        }
+                    }
+                    break;
+                case DOWN:
+                    newPos = head.translateBy(0, 1);
+                    for(int i = 0; i < 50; i++) {
+                        if(safeTile(newPos)) {
+                            root.clarity++;
+                            newPos = newPos.translateBy(0,1);
+                        }
+                    }
+                    break;
+                case LEFT:
+                    newPos = head.translateBy(-1, 0);
+                    for(int i = 0; i < 50; i++) {
+                        if(safeTile(newPos)) {
+                            root.clarity++;
+                            newPos = newPos.translateBy(-1,0);
+                        }
+                    }
+                    break;
+                case RIGHT:
+                    newPos = head.translateBy(1, 0);
+                    for(int i = 0; i < 50; i++) {
+                        if(safeTile(newPos)) {
+                            root.clarity++;
+                            newPos = newPos.translateBy(1,0);
+                        }
+                    }
+                    break;
+            }
+
+        }
+        //long time = System.currentTimeMillis() - start;
+        //System.out.println("Time to calc clarity: "+time);
 
         // calc distance to enemies
         if(currentDepth < maxEnemyDistCalcStep) {
@@ -161,6 +207,11 @@ public class PathElement {
             }
             root.distToEnemies.add(shortestDistance);
         }
+    }
+
+    private void reachedEnd() {
+        root.enemyTiles.add(enemies.size());
+        root.ownTiles.add(self.size());
     }
 
     /**
@@ -189,6 +240,14 @@ public class PathElement {
         //check self
         for (MapCoordinate me : self){
             if(coordinate.equals(me)) {
+                res = false;
+                break;
+            }
+        }
+
+        //check enemy heads
+        for (MapCoordinate head : newHeades){
+            if(coordinate.equals(head)) {
                 res = false;
                 break;
             }

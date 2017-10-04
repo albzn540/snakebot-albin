@@ -205,8 +205,38 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
                 }
             });
 
-            //todo Om nodes skiljer sig med bara 10% ska den välja den med längst distToEnemies.
-            chosenDirection = syncedList.get(0).direction; //choose the one with the most nodes
+            int getNumber = 10;
+            PathElement best = pathOptions.get(0);
+            PathElement current = pathOptions.get(0);
+            SnakeDirection betterDirection = null;
+            for(int i = 1; i <= getNumber; i++) {
+                //start at index one since
+                //best node is at index 0 in pathOptions
+                current = pathOptions.get(i);
+                double percentageOf = 100*((double) current.nodes / (double) best.nodes);
+                //System.out.println(percentageOf);
+                if(percentageOf > 90 && best.clarity < current.clarity ) {
+                    best = current;
+                    betterDirection = pathOptions.get(i).direction;
+                    //System.out.println("Better direction [1]" + betterDirection);
+                }
+                else {
+                    double clarityDiff = current.clarity - best.clarity;
+                    if(percentageOf > 70 && clarityDiff > 300) {
+                        best = current;
+                        betterDirection = pathOptions.get(i).direction;
+                        //System.out.println("Better direction [2]" + betterDirection);
+                    }
+                }
+            }
+
+
+            if(betterDirection != null) {
+                chosenDirection = betterDirection;
+            }
+            else {
+                chosenDirection = syncedList.get(0).direction; //choose the one with the most nodes
+            }
 
         } else {
             //Failsafe - Go in direction I can go furthest
@@ -293,6 +323,8 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
             else sum /= pathOptions.get(i).distToEnemies.size();
             System.out.print(", Average dist to enemies: " + sum);
 
+            System.out.print(", Last clarity: " + pathOptions.get(i).clarity);
+
             System.out.print("\n");
             nr++;
         }
@@ -333,6 +365,9 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
         System.out.println("");
         LOGGER.info("The game is over and can be viewed at: {}", url);
 
+        Collections.sort(timers);
+        Collections.reverse(timers);
+
         //calc average time
         long tot = 0;
         for (Long time : timers) {
@@ -340,6 +375,7 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
         }
         long average = tot / timers.size();
         LOGGER.info("Average response time: " + average);
+        LOGGER.info("Top 5 worst responsetimes: " + timers.get(0) + ", " + timers.get(1) + ", "+ timers.get(2) + ", "+ timers.get(3));
         LOGGER.info("You survived " + turns + " number of turns.");
         LOGGER.info("Number of failsafes: " + failsafes);
         System.out.println("");
