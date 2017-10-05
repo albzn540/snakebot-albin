@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 [![Build Status](http://jenkins.snake.cygni.se/buildStatus/icon?job=snake client java)](http://jenkins.snake.cygni.se/job/snake%20client%20java/)
 
 This a Snake Client written in Java 8.
@@ -43,3 +44,7 @@ public void onMapUpdate(MapUpdateEvent mapUpdateEvent) {
 ```
 
 For every MapUpdateEvent received your are expected to reply with a SnakeDirection (UP, DOWN, LEFT or RIGHT). 
+=======
+# snakebot-albin
+Snakebot challenge by Cygni
+>>>>>>> 20a6222f0a7604fc667250632097002034e3d162
