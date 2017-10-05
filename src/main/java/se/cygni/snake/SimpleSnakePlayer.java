@@ -205,11 +205,19 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
                 }
             });
 
+            boolean collisionFlag = false;
+
             int getNumber = 10;
             PathElement best = pathOptions.get(0);
             PathElement current = pathOptions.get(0);
             SnakeDirection betterDirection = null;
             for(int i = 1; i <= getNumber; i++) {
+
+                //check if a collision is about to happen
+                if(best.distToEnemies == 0) {
+                    collisionFlag = true;
+                }
+
                 //start at index one since
                 //best node is at index 0 in pathOptions
                 current = pathOptions.get(i);
@@ -227,6 +235,11 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
                         betterDirection = pathOptions.get(i).direction;
                         //System.out.println("Better direction [2]" + betterDirection);
                     }
+                }
+
+                if(collisionFlag && percentageOf > 60) {
+                    best = current;
+                    System.out.println("Collision avoided");
                 }
             }
 
@@ -315,13 +328,17 @@ public class SimpleSnakePlayer extends BaseSnakeClient {
             else sum /= pathOptions.get(i).ownTiles.size();
             System.out.print(", Average Own tiles: " + sum);
 
+            /*
             for (Integer tile : pathOptions.get(i).distToEnemies) {
                 sum += tile;
             }
+
             if(pathOptions.get(i).distToEnemies.size() == 0)
                 sum = 0;
             else sum /= pathOptions.get(i).distToEnemies.size();
-            System.out.print(", Average dist to enemies: " + sum);
+            System.out.print(", Average dist to enemies: " + sum); */
+
+            System.out.println(", Dist to enemy : " + pathOptions.get(i).distToEnemies);
 
             System.out.print(", Last clarity: " + pathOptions.get(i).clarity);
 

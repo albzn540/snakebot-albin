@@ -10,7 +10,7 @@ import java.util.Random;
 public class PathElement {
     // -------- Settings -------//
     private int maxPredictSteps = 180;           //how far we will predict
-    private int maxEnemyDistCalcStep = 0;       //how far we will count total enemy distance
+    private int maxEnemyDistCalcStep = 1;       //how far we will count total enemy distance
 
     /**
      * NOTE! "Obstacle" Counts as "obstacle", "other snakes" and "own snake body".
@@ -37,7 +37,7 @@ public class PathElement {
     public ArrayList<MapCoordinate> obstacles;
     public ArrayList<Integer> ownTiles;
     public ArrayList<Integer> enemyTiles;
-    public ArrayList<Integer> distToEnemies;
+    public int distToEnemies;
     public int clarity;
 
 
@@ -48,7 +48,7 @@ public class PathElement {
         this.obstacles = new ArrayList<>();
         enemyTiles = new ArrayList<>();
         ownTiles = new ArrayList<>();
-        distToEnemies = new ArrayList<>();
+        distToEnemies = 0;
 
         if(snakesAlive == 2) {
             maxPredictSteps = 200;
@@ -94,7 +94,6 @@ public class PathElement {
             if(safeTile(newPos))
                 newHeades.add(newPos);
         }
-
 
         // if depth not reached, predict own moves
         if(currentDepth < maxPredictSteps) {
@@ -198,14 +197,15 @@ public class PathElement {
         //long time = System.currentTimeMillis() - start;
         //System.out.println("Time to calc clarity: "+time);
 
-        // calc distance to enemies
-        if(currentDepth < maxEnemyDistCalcStep) {
+
+        // alc distance to enemies
+        if(currentDepth <= maxEnemyDistCalcStep) {
             int shortestDistance = 10000000;
             for (MapCoordinate enemyPart : enemies) {
                 if(head.getManhattanDistanceTo(enemyPart) < shortestDistance)
                     shortestDistance = head.getManhattanDistanceTo(enemyPart);
             }
-            root.distToEnemies.add(shortestDistance);
+            root.distToEnemies = shortestDistance;
         }
     }
 
